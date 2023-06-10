@@ -1,0 +1,193 @@
+print 123 + 234;
+print "123" + "234";
+
+// test scope:
+var a = "global a";
+var b = "global b";
+var c = "global c";
+{
+  var a = "outer a";
+  var b = "outer b";
+  {
+    var a = "inner a";
+    print a;
+    print b;
+    print c;
+  }
+  print a;
+  print b;
+  print c;
+}
+print a;
+print b;
+print c;
+
+
+// test control flow:
+if (true) {
+  print "ok";
+} else {
+  print "not ok";
+}
+
+if (false) {
+  print "ok";
+} else {
+  print "not ok";
+}
+
+if (10 > 4) {
+  print "ok";
+} else {
+  print "not ok";
+}
+
+
+// test logical operators:
+print "hi" or 2; // "hi"
+print nil or "yes"; // "yes"
+print nil and "yes"; // "<nil>"
+
+
+// test for loops:
+var a = 0;
+var temp;
+
+for (var b = 1; a < 10000; b = temp + b) {
+  print a;
+  temp = a;
+  a = b;
+}
+
+
+// test builtin function `clock()`:
+print "clock()";
+print clock();
+print clock;
+
+
+// test user-defined function without return value:
+fun sayHi(first, last) {
+  print first;
+  print last;
+  print "Hi, " + first + " " + last + "!";
+}
+
+var result = sayHi("Dear", "Reader");
+print result;
+
+
+// test user-defined function with return value:
+fun fib(n) {
+  if (n <= 1) return n;
+  return fib(n - 2) + fib(n - 1);
+}
+
+for (var i = 0; i < 5; i = i + 1) {
+  print fib(i);
+}
+
+
+// test local function:
+fun makeCounter() {
+  var i = 0;
+  fun count() {
+    i = i + 1;
+    print i;
+  }
+
+  return count;
+}
+
+var counter = makeCounter();
+counter(); // "1"
+counter(); // "2"
+
+
+// test closure:
+var a = "global";
+{
+  fun showA() {
+    print a;
+  }
+
+  showA(); // "global"
+  var a = "block";
+  showA(); // "global"
+}
+
+
+// test class:
+class Breakfast {
+  cook() {
+    print "Eggs a-fryin'!";
+  }
+
+  serve(who) {
+    print "Enjoy your breakfast, " + who + ".";
+  }
+
+  price() {
+    return this.cost + 20;
+  }
+}
+
+print Breakfast;
+
+
+// test class instance:
+var breakfast = Breakfast();
+print breakfast;
+breakfast.cook();
+breakfast.serve("me");
+
+
+// test instance properties:
+breakfast.cost = 10;
+
+print breakfast.cost;
+print breakfast.price();
+
+var priceFn = breakfast.price;
+print priceFn();
+
+
+
+// test initializer:
+class Lunch {
+  init(name) {
+    this.name = name;
+    this.cost = 100;
+    return;
+    this.cost = 200; // unreachable
+  }
+
+  getName() {
+    return this.name;
+  }
+
+  price() {
+    return this.cost + 20;
+  }
+}
+
+var lunch = Lunch("some lunch");
+print lunch.getName();
+print lunch.price();
+
+
+// test inheritance:
+class Doughnut {
+  cook() {
+    print "Fry until golden brown.";
+  }
+}
+
+class BostonCream < Doughnut {
+  cook() {
+    super.cook();
+    print "Pipe full of custard and coat with chocolate.";
+  }
+}
+
+BostonCream().cook();
