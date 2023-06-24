@@ -28,7 +28,3 @@ A Go implementation of Lox, as introduced in the book [Crafting Interpreters](ht
 ### Testing
 
 - run `go test ./test/...` (or run `./scripts/test.sh`)
-
----
-
-&copy; 2023 Nixon Yung, All Rights Reserved.

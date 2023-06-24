@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	lox "golox/internal"
 	"golox/internal/runner"
 	"log"
 
@@ -14,7 +15,7 @@ func handleErr(err error) {
 
 func main() {
 	// parse flags:
-	isDebug := pflag.Bool("debug", false, "enables debug logs")
+	pflag.BoolVar(&lox.ConfigIsDebug, "debug", false, "enables debug logs")
 	pflag.Parse()
 
 	// parse args:
@@ -24,7 +25,7 @@ func main() {
 	log.SetFlags(0)
 
 	// init runner:
-	r := runner.NewRunner(*isDebug)
+	r := runner.NewRunner(lox.ConfigIsDebug)
 
 	switch {
 	case len(args) > 1:

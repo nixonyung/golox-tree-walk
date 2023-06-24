@@ -1,4 +1,4 @@
-package lox
+package golox
 
 type Token struct {
 	Location
@@ -31,10 +31,10 @@ const (
 	TokenTypeBangEqual
 	TokenTypeEqual
 	TokenTypeEqualEqual
-	TokenTypeGreater
-	TokenTypeGreaterEqual
 	TokenTypeLess
 	TokenTypeLessEqual
+	TokenTypeGreater
+	TokenTypeGreaterEqual
 
 	// literals:
 	TokenTypeString

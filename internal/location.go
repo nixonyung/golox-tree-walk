@@ -1,15 +1,16 @@
-package lox
+package golox
 
 import "fmt"
 
+// token location in source file
 type Location struct {
 	SrcPath string
 	Line    int
 	Col     int
 }
 
-func (l Location) String() string {
+func (loc Location) String() string {
 	return fmt.Sprintf("%s:%d:%d",
-		l.SrcPath, l.Line, l.Col,
+		loc.SrcPath, loc.Line, loc.Col,
 	)
 }

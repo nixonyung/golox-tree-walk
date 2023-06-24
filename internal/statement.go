@@ -1,26 +1,38 @@
-package lox
+package golox
 
 import (
 	"strings"
 )
 
 const (
-	INDENT = "    "
+	STMT_INDENT = "    "
 )
 
 type Statement interface {
-	isStatement() bool
+	implStatement()
 	GetLocation() Location
-	String() string
+	String() string // does not append newline for all statement types
 }
+
+func (*StatementBlock) implStatement()      {}
+func (*StatementExpression) implStatement() {}
+func (*StatementVar) implStatement()        {}
+func (*StatementIf) implStatement()         {}
+func (*StatementWhile) implStatement()      {}
+func (*StatementFun) implStatement()        {}
+func (*StatementReturn) implStatement()     {}
+func (*StatementClass) implStatement()      {}
+func (*StatementPrint) implStatement()      {}
 
 type StatementBlock struct {
 	Location   // not requiring a Token, as the statement can be generated
 	Statements []Statement
 }
 
-func (*StatementBlock) isStatement() bool          { return true }
-func (stmt *StatementBlock) GetLocation() Location { return stmt.Location }
+func (stmt *StatementBlock) GetLocation() Location {
+	return stmt.Location
+}
+
 func (stmt *StatementBlock) String() string {
 	var b strings.Builder
 	b.WriteString("{\n")
@@ -36,8 +48,10 @@ type StatementExpression struct {
 	Expression
 }
 
-func (*StatementExpression) isStatement() bool          { return true }
-func (stmt *StatementExpression) GetLocation() Location { return stmt.Expression.GetLocation() }
+func (stmt *StatementExpression) GetLocation() Location {
+	return stmt.Expression.GetLocation()
+}
+
 func (stmt *StatementExpression) String() string {
 	var b strings.Builder
 	if stmt.Expression != nil {
@@ -53,8 +67,10 @@ type StatementVar struct {
 	Expression
 }
 
-func (*StatementVar) isStatement() bool          { return true }
-func (stmt *StatementVar) GetLocation() Location { return stmt.VarToken.Location }
+func (stmt *StatementVar) GetLocation() Location {
+	return stmt.VarToken.Location
+}
+
 func (stmt *StatementVar) String() string {
 	var b strings.Builder
 	b.WriteString("var ")
@@ -76,8 +92,10 @@ type StatementIf struct {
 	Else      Statement
 }
 
-func (*StatementIf) isStatement() bool          { return true }
-func (stmt *StatementIf) GetLocation() Location { return stmt.IfToken.Location }
+func (stmt *StatementIf) GetLocation() Location {
+	return stmt.IfToken.Location
+}
+
 func (stmt *StatementIf) String() string {
 	var b strings.Builder
 	b.WriteString("if ")
@@ -109,8 +127,10 @@ type StatementWhile struct {
 	Body       Statement
 }
 
-func (*StatementWhile) isStatement() bool          { return true }
-func (stmt *StatementWhile) GetLocation() Location { return stmt.WhileToken.Location }
+func (stmt *StatementWhile) GetLocation() Location {
+	return stmt.WhileToken.Location
+}
+
 func (stmt *StatementWhile) String() string {
 	var b strings.Builder
 	b.WriteString("while ")
@@ -134,7 +154,6 @@ type StatementFun struct {
 	Body       []Statement
 }
 
-func (*StatementFun) isStatement() bool { return true }
 func (stmt *StatementFun) GetLocation() Location {
 	if stmt.FunToken != (Token{}) {
 		// is a function
@@ -144,6 +163,7 @@ func (stmt *StatementFun) GetLocation() Location {
 		return stmt.Identifier.Location
 	}
 }
+
 func (stmt *StatementFun) String() string {
 	var b strings.Builder
 	b.WriteString("fun ")
@@ -158,6 +178,7 @@ func (stmt *StatementFun) String() string {
 	b.WriteString(") {\n")
 	for _, stmt := range stmt.Body {
 		b.WriteString(stmt.String())
+		b.WriteString("\n")
 	}
 	b.WriteString("}")
 	return b.String()
@@ -168,8 +189,10 @@ type StatementReturn struct {
 	Expression
 }
 
-func (*StatementReturn) isStatement() bool          { return true }
-func (stmt *StatementReturn) GetLocation() Location { return stmt.ReturnToken.Location }
+func (stmt *StatementReturn) GetLocation() Location {
+	return stmt.ReturnToken.Location
+}
+
 func (stmt *StatementReturn) String() string {
 	var b strings.Builder
 	b.WriteString("return")
@@ -188,8 +211,10 @@ type StatementClass struct {
 	Methods    []*StatementFun
 }
 
-func (*StatementClass) isStatement() bool          { return true }
-func (stmt *StatementClass) GetLocation() Location { return stmt.ClassToken.Location }
+func (stmt *StatementClass) GetLocation() Location {
+	return stmt.ClassToken.Location
+}
+
 func (stmt *StatementClass) String() string {
 	var b strings.Builder
 	b.WriteString("class ")
@@ -212,8 +237,10 @@ type StatementPrint struct {
 	Expression
 }
 
-func (*StatementPrint) isStatement() bool          { return true }
-func (stmt *StatementPrint) GetLocation() Location { return stmt.PrintToken.Location }
+func (stmt *StatementPrint) GetLocation() Location {
+	return stmt.PrintToken.Location
+}
+
 func (stmt *StatementPrint) String() string {
 	var b strings.Builder
 	b.WriteString("print")

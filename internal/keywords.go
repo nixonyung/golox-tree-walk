@@ -1,4 +1,4 @@
-package lox
+package golox
 
 var (
 	Keywords = map[string]TokenType{

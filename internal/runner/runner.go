@@ -23,14 +23,14 @@ type Runner struct {
 
 func (r *Runner) run(source []rune) error {
 	tokens, err := lexer.
-		NewLexer(r.isDebug, r.srcPath).
-		TokensFromSource(source)
+		NewLexer().
+		TokensFromSource(source, r.srcPath)
 	if err != nil {
 		return err
 	}
 
 	stmts, err := parser.
-		NewParser(r.isDebug).
+		NewParser().
 		StatementsFromTokens(tokens)
 	if err != nil {
 		return err

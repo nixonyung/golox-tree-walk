@@ -2,24 +2,14 @@ package lexer
 
 import (
 	golox "golox/internal"
-	"golox/internal/helpers"
 	"strconv"
 )
 
 type Lexer struct {
-	// configs:
-	isDebug bool
-	srcPath string
-
-	// inputs:
-	source []rune
-
-	// outputs:
-	tokens []golox.Token
-
-	// states:
-	curr, currLine, currCol int
-	prev, prevLine, prevCol int
+	source          []rune        // input
+	srcPath         string        // input
+	tokens          []golox.Token // output
+	curr, line, col int
 }
 
 func (l *Lexer) lookAhead(k int) (rune, bool) {
@@ -32,7 +22,7 @@ func (l *Lexer) lookAhead(k int) (rune, bool) {
 
 func (l *Lexer) advance(k int) {
 	l.curr += k
-	l.currCol += k
+	l.col += k
 }
 
 func (l *Lexer) lexeme(k int) string {
@@ -44,38 +34,43 @@ func (l *Lexer) lexeme(k int) string {
 }
 
 func (l *Lexer) newline() {
-	l.currLine++
-	l.currCol = 1
+	l.line++
+	l.col = 1
 }
 
-func (l *Lexer) resetStart() {
-	l.prev = l.curr
-	l.prevLine = l.currLine
-	l.prevCol = l.currCol
-}
-
-func (l *Lexer) consumeAdvanceReset(k int, tokenType golox.TokenType, literalValue any) {
-	newToken := golox.Token{
+func (l *Lexer) consumeAsToken(k int, tokenType golox.TokenType, literalValue any) {
+	tkn := golox.Token{
 		Location: golox.Location{
 			SrcPath: l.srcPath,
-			Line:    l.prevLine,
-			Col:     l.prevCol,
+			Line:    l.line,
+			Col:     l.col,
 		},
 		TokenType:    tokenType,
 		LiteralValue: literalValue,
 		Lexeme:       l.lexeme(k),
 	}
-	l.tokens = append(l.tokens, newToken)
-	l.logAddedToken(newToken)
+	l.tokens = append(l.tokens, tkn)
+	golox.Logf(
+		golox.ModuleLexer,
+		"%s:%d:%d: '%s' (%s)",
+		l.srcPath, l.line, l.col, tkn.Lexeme, tkn.TokenType,
+	)
 	l.advance(k)
-	l.resetStart()
 }
 
-func (l *Lexer) TokensFromSource(source []rune) ([]golox.Token, error) {
+func isCharAlphabet(ch rune) bool {
+	return ('A' <= ch && ch <= 'Z') || ('a' <= ch && ch <= 'z') || ch == '_'
+}
+
+func isCharNumeric(ch rune) bool {
+	return ('0' <= ch && ch <= '9')
+}
+
+func (l *Lexer) TokensFromSource(source []rune, srcPath string) ([]golox.Token, error) {
 	l.source = source
+	l.srcPath = srcPath
 	l.tokens = []golox.Token{}
-	l.curr, l.currLine, l.currCol = 0, 1, 1
-	l.prev, l.prevLine, l.prevCol = 0, 1, 1
+	l.curr, l.line, l.col = 0, 1, 1
 
 	for {
 		if ch, ok := l.lookAhead(0); !ok {
@@ -85,93 +80,100 @@ func (l *Lexer) TokensFromSource(source []rune) ([]golox.Token, error) {
 			case '\n':
 				l.advance(1)
 				l.newline()
-				l.resetStart()
 			case ' ', '\r', '\t':
 				l.advance(1)
-				l.resetStart()
 			case '(':
-				l.consumeAdvanceReset(1, golox.TokenTypeLeftParen, nil)
+				l.consumeAsToken(1, golox.TokenTypeLeftParen, nil)
 			case ')':
-				l.consumeAdvanceReset(1, golox.TokenTypeRightParen, nil)
+				l.consumeAsToken(1, golox.TokenTypeRightParen, nil)
 			case '{':
-				l.consumeAdvanceReset(1, golox.TokenTypeLeftBrace, nil)
+				l.consumeAsToken(1, golox.TokenTypeLeftBrace, nil)
 			case '}':
-				l.consumeAdvanceReset(1, golox.TokenTypeRightBrace, nil)
+				l.consumeAsToken(1, golox.TokenTypeRightBrace, nil)
 			case ',':
-				l.consumeAdvanceReset(1, golox.TokenTypeComma, nil)
+				l.consumeAsToken(1, golox.TokenTypeComma, nil)
 			case '.':
-				l.consumeAdvanceReset(1, golox.TokenTypeDot, nil)
+				l.consumeAsToken(1, golox.TokenTypeDot, nil)
 			case ';':
-				l.consumeAdvanceReset(1, golox.TokenTypeSemicolon, nil)
+				l.consumeAsToken(1, golox.TokenTypeSemicolon, nil)
 			case '+':
-				l.consumeAdvanceReset(1, golox.TokenTypePlus, nil)
+				l.consumeAsToken(1, golox.TokenTypePlus, nil)
 			case '-':
-				l.consumeAdvanceReset(1, golox.TokenTypeMinus, nil)
+				l.consumeAsToken(1, golox.TokenTypeMinus, nil)
 			case '*':
-				l.consumeAdvanceReset(1, golox.TokenTypeStar, nil)
+				l.consumeAsToken(1, golox.TokenTypeStar, nil)
 			case '/':
 				if ch, ok := l.lookAhead(1); ok && ch == '/' {
-					k := 2
-					for ; ; k++ {
-						if ch, ok := l.lookAhead(k); !ok || ch == '\n' {
+					l.advance(2)
+					for {
+						if ch, ok := l.lookAhead(0); !ok || ch == '\n' {
 							break
+						} else {
+							l.advance(1)
 						}
 					}
-					l.advance(k + 1)
+					l.advance(1)
 					l.newline()
-					l.resetStart()
 				} else {
-					l.consumeAdvanceReset(1, golox.TokenTypeSlash, nil)
+					l.consumeAsToken(1, golox.TokenTypeSlash, nil)
 				}
 			case '!':
 				if ch, ok := l.lookAhead(1); ok && ch == '=' {
-					l.consumeAdvanceReset(2, golox.TokenTypeBangEqual, nil)
+					l.consumeAsToken(2, golox.TokenTypeBangEqual, nil)
 				} else {
-					l.consumeAdvanceReset(1, golox.TokenTypeBang, nil)
+					l.consumeAsToken(1, golox.TokenTypeBang, nil)
 				}
 			case '=':
 				if ch, ok := l.lookAhead(1); ok && ch == '=' {
-					l.consumeAdvanceReset(2, golox.TokenTypeEqualEqual, nil)
+					l.consumeAsToken(2, golox.TokenTypeEqualEqual, nil)
 				} else {
-					l.consumeAdvanceReset(1, golox.TokenTypeEqual, nil)
+					l.consumeAsToken(1, golox.TokenTypeEqual, nil)
 				}
 			case '<':
 				if ch, ok := l.lookAhead(1); ok && ch == '=' {
-					l.consumeAdvanceReset(2, golox.TokenTypeLessEqual, nil)
+					l.consumeAsToken(2, golox.TokenTypeLessEqual, nil)
 				} else {
-					l.consumeAdvanceReset(1, golox.TokenTypeLess, nil)
+					l.consumeAsToken(1, golox.TokenTypeLess, nil)
 				}
 			case '>':
 				if ch, ok := l.lookAhead(1); ok && ch == '=' {
-					l.consumeAdvanceReset(2, golox.TokenTypeGreaterEqual, nil)
+					l.consumeAsToken(2, golox.TokenTypeGreaterEqual, nil)
 				} else {
-					l.consumeAdvanceReset(1, golox.TokenTypeGreater, nil)
+					l.consumeAsToken(1, golox.TokenTypeGreater, nil)
 				}
 			case '"':
+				leftQuoteLine, leftQuoteCol := l.line, l.col
 				k := 1
 				for ; ; k++ {
 					if ch, ok := l.lookAhead(k); !ok {
-						return nil, l.newErrorUnterminatedString()
+						return nil, golox.NewErrorf(
+							golox.Location{
+								SrcPath: l.srcPath,
+								Line:    l.line,
+								Col:     l.col,
+							},
+							"unterminated string, started at line %d:%d",
+							leftQuoteLine, leftQuoteCol)
 					} else if ch == '"' {
 						break
 					} else if ch == '\n' {
 						l.newline()
 					}
 				}
-				l.consumeAdvanceReset(k+1, golox.TokenTypeString, string(l.lexeme(k)[1:]))
+				l.consumeAsToken(k+1, golox.TokenTypeString, string(l.lexeme(k)[1:]))
 			default:
 				switch {
-				case helpers.IsCharNumeric(ch):
+				case isCharNumeric(ch):
 					k := 1
 					for ; ; k++ {
 						if ch, ok := l.lookAhead(k); !ok {
 							break
-						} else if !helpers.IsCharNumeric(ch) {
+						} else if !isCharNumeric(ch) {
 							if ch != '.' {
 								// end of number if not numeric and not == '.'
 								break
 							} else {
-								if ch2, ok2 := l.lookAhead(k + 1); !ok2 || !helpers.IsCharNumeric(ch2) {
+								if ch2, ok2 := l.lookAhead(k + 1); !ok2 || !isCharNumeric(ch2) {
 									// char after '.' is not numeric, so the '.' is a method call, should break
 									break
 								}
@@ -180,41 +182,46 @@ func (l *Lexer) TokensFromSource(source []rune) ([]golox.Token, error) {
 						}
 					}
 					if val, err := strconv.ParseFloat(l.lexeme(k), 64); err != nil {
-						return nil, l.newErrorInvalidNumericString(err)
+						return nil, golox.NewErrorf(
+							golox.Location{
+								SrcPath: l.srcPath,
+								Line:    l.line,
+								Col:     l.col,
+							},
+							"invalid numeric string: %s", err.Error(),
+						)
 					} else {
-						l.consumeAdvanceReset(k, golox.TokenTypeNumber, val)
+						l.consumeAsToken(k, golox.TokenTypeNumber, val)
 					}
-				case helpers.IsCharAlphabet(ch) || ch == '_':
+				case isCharAlphabet(ch):
 					k := 1
 					for ; ; k++ {
-						if ch, ok := l.lookAhead(k); !ok ||
-							(ch != '_' &&
-								!helpers.IsCharAlphabet(ch) &&
-								!helpers.IsCharNumeric(ch)) {
+						if ch, ok := l.lookAhead(k); !ok || (!isCharAlphabet(ch) && !isCharNumeric(ch)) {
 							break
 						}
 					}
 					if tokenType, isKeyword := golox.Keywords[l.lexeme(k)]; isKeyword {
-						l.consumeAdvanceReset(k, tokenType, nil)
+						l.consumeAsToken(k, tokenType, nil)
 					} else {
-						l.consumeAdvanceReset(k, golox.TokenTypeIdentifier, nil)
+						l.consumeAsToken(k, golox.TokenTypeIdentifier, nil)
 					}
 				default:
-					return nil, l.newErrorUnexpectedCharacter(ch)
+					return nil, golox.NewErrorf(
+						golox.Location{
+							SrcPath: l.srcPath,
+							Line:    l.line,
+							Col:     l.col,
+						},
+						"unexpected character '%c'", ch,
+					)
 				}
 			}
 		}
 	}
-	l.consumeAdvanceReset(0, golox.TokenTypeEOF, nil)
+	l.consumeAsToken(0, golox.TokenTypeEOF, nil)
 	return l.tokens, nil
 }
 
-func NewLexer(
-	isDebug bool,
-	srcPath string,
-) *Lexer {
-	return &Lexer{
-		isDebug: isDebug,
-		srcPath: srcPath,
-	}
+func NewLexer() *Lexer {
+	return &Lexer{}
 }

@@ -3,7 +3,6 @@ package interpreter
 import (
 	"fmt"
 	golox "golox/internal"
-	"golox/internal/helpers"
 	"golox/internal/interpreter/builtins"
 	"strconv"
 )
@@ -120,6 +119,30 @@ func (itp *Interpreter) getVar(
 	}
 }
 
+func assertTwo[S any, T any](lhs any, rhs any) (S, T, bool) {
+	val1, ok1 := lhs.(S)
+	if !ok1 {
+		return *new(S), *new(T), false
+	}
+
+	val2, ok2 := rhs.(T)
+	if !ok2 {
+		return *new(S), *new(T), false
+	}
+
+	return val1, val2, true
+}
+
+func isValueTruthy(val any) bool {
+	if val == nil {
+		return false
+	} else if val, ok := val.(bool); ok {
+		return val
+	} else {
+		return true // strings and numbers are always true
+	}
+}
+
 func (itp *Interpreter) execute(stmt golox.Statement) error {
 	switch stmt := stmt.(type) {
 	case nil:
@@ -153,7 +176,7 @@ func (itp *Interpreter) execute(stmt golox.Statement) error {
 		if val, err := itp.evaluate(stmt.Condition); err != nil {
 			return err
 		} else {
-			isTrue := helpers.IsValueTruthy(val)
+			isTrue := isValueTruthy(val)
 			itp.logEvaluatedStatementIfCondition(stmt, val, isTrue)
 			if isTrue {
 				if err := itp.execute(stmt.Then); err != nil {
@@ -171,7 +194,7 @@ func (itp *Interpreter) execute(stmt golox.Statement) error {
 			if val, err := itp.evaluate(stmt.Condition); err != nil {
 				return err
 			} else {
-				isTrue := helpers.IsValueTruthy(val)
+				isTrue := isValueTruthy(val)
 				itp.logEvaluatedStatementWhileCondition(stmt, val, isTrue)
 				if isTrue {
 					if err := itp.execute(stmt.Body); err != nil {
@@ -320,22 +343,14 @@ func (itp *Interpreter) evaluate(expr golox.Expression) (any, error) {
 	case *golox.ExpressionSuper:
 		if dist, ok := itp.resolvedLocalVars[expr]; !ok {
 			return nil, itp.newErrorUndefinedVariable(expr.SuperToken)
+		} else if superclass, ok := itp.nthEnclosingScope(dist).NameToValue["super"].(*LoxClass); !ok {
+			return nil, itp.newErrorInvalidSuperclassValue(expr, superclass)
+		} else if method, err := superclass.FindMethod(expr.Method); err != nil {
+			return nil, err
+		} else if thisVal, ok := itp.nthEnclosingScope(dist - 1).NameToValue["this"].(*LoxInstance); !ok {
+			return nil, itp.newErrorInvalidThisValue(expr, thisVal)
 		} else {
-			superVal := itp.nthEnclosingScope(dist).NameToValue["super"]
-
-			if sc, ok := superVal.(*LoxClass); !ok {
-				return nil, itp.newErrorInvalidSuperclassValue(expr, superVal)
-			} else if method, err := sc.FindMethod(expr.Method); err != nil {
-				return nil, err
-			} else {
-				objVal := itp.nthEnclosingScope(dist - 1).NameToValue["this"]
-
-				if obj, ok := objVal.(*LoxInstance); !ok {
-					return nil, itp.newErrorInvalidThisValue(expr, objVal)
-				} else {
-					return method.WithThisBoundTo(obj), nil
-				}
-			}
+			return method.WithThisBoundTo(thisVal), nil
 		}
 
 	case *golox.ExpressionUnary:
@@ -346,11 +361,10 @@ func (itp *Interpreter) evaluate(expr golox.Expression) (any, error) {
 			case golox.TokenTypeMinus:
 				if rhs, ok := rhs.(float64); ok {
 					return -rhs, nil
-				} else {
-					return nil, itp.newErrorOperandMustBe("a number", expr.Operator)
 				}
+				return nil, itp.newErrorOperandMustBe("a number", expr.Operator)
 			case golox.TokenTypeBang:
-				return !helpers.IsValueTruthy(rhs), nil
+				return !isValueTruthy(rhs), nil
 			}
 		}
 
@@ -362,74 +376,79 @@ func (itp *Interpreter) evaluate(expr golox.Expression) (any, error) {
 		} else {
 			switch expr.Operator.TokenType {
 			case golox.TokenTypeGreater:
-				if lhs, rhs, ok := helpers.AssertTwo[float64, float64](lhs, rhs); ok {
+				if lhs, rhs, ok := assertTwo[float64, float64](lhs, rhs); ok {
 					return lhs > rhs, nil
-				} else {
-					return nil, itp.newErrorOperandsMustBe("both numbers", expr.Operator)
 				}
+				return nil, itp.newErrorOperandsMustBe("both numbers", expr.Operator)
+
 			case golox.TokenTypeGreaterEqual:
-				if lhs, rhs, ok := helpers.AssertTwo[float64, float64](lhs, rhs); ok {
+				if lhs, rhs, ok := assertTwo[float64, float64](lhs, rhs); ok {
 					return lhs >= rhs, nil
-				} else {
-					return nil, itp.newErrorOperandsMustBe("both numbers", expr.Operator)
 				}
+				return nil, itp.newErrorOperandsMustBe("both numbers", expr.Operator)
+
 			case golox.TokenTypeLess:
-				if lhs, rhs, ok := helpers.AssertTwo[float64, float64](lhs, rhs); ok {
+				if lhs, rhs, ok := assertTwo[float64, float64](lhs, rhs); ok {
 					return lhs < rhs, nil
-				} else {
-					return nil, itp.newErrorOperandsMustBe("both numbers", expr.Operator)
 				}
+				return nil, itp.newErrorOperandsMustBe("both numbers", expr.Operator)
+
 			case golox.TokenTypeLessEqual:
-				if lhs, rhs, ok := helpers.AssertTwo[float64, float64](lhs, rhs); ok {
+				if lhs, rhs, ok := assertTwo[float64, float64](lhs, rhs); ok {
 					return lhs <= rhs, nil
-				} else {
-					return nil, itp.newErrorOperandsMustBe("both numbers", expr.Operator)
 				}
+				return nil, itp.newErrorOperandsMustBe("both numbers", expr.Operator)
+
 			case golox.TokenTypeBangEqual:
 				return lhs != rhs, nil
+
 			case golox.TokenTypeEqualEqual:
 				return lhs == rhs, nil
+
 			case golox.TokenTypeMinus:
-				if lhs, rhs, ok := helpers.AssertTwo[float64, float64](lhs, rhs); ok {
+				if lhs, rhs, ok := assertTwo[float64, float64](lhs, rhs); ok {
 					return lhs - rhs, nil
-				} else {
-					return nil, itp.newErrorOperandsMustBe("both numbers", expr.Operator)
 				}
+				return nil, itp.newErrorOperandsMustBe("both numbers", expr.Operator)
+
 			case golox.TokenTypePlus:
-				if lhs, rhs, ok := helpers.AssertTwo[float64, float64](lhs, rhs); ok {
+				if lhs, rhs, ok := assertTwo[float64, float64](lhs, rhs); ok {
 					return lhs + rhs, nil
 				}
-				if lhs, rhs, ok := helpers.AssertTwo[string, string](lhs, rhs); ok {
+				if lhs, rhs, ok := assertTwo[string, string](lhs, rhs); ok {
 					return lhs + rhs, nil
 				}
 				return nil, itp.newErrorOperandsMustBe("both numbers or both strings", expr.Operator)
 
 			case golox.TokenTypeSlash:
-				if lhs, rhs, ok := helpers.AssertTwo[float64, float64](lhs, rhs); ok {
+				if lhs, rhs, ok := assertTwo[float64, float64](lhs, rhs); ok {
 					return lhs / rhs, nil
-				} else {
-					return nil, itp.newErrorOperandsMustBe("both numbers", expr.Operator)
 				}
+				return nil, itp.newErrorOperandsMustBe("both numbers", expr.Operator)
+
 			case golox.TokenTypeStar:
-				if lhs, rhs, ok := helpers.AssertTwo[float64, float64](lhs, rhs); ok {
+				if lhs, rhs, ok := assertTwo[float64, float64](lhs, rhs); ok {
 					return lhs * rhs, nil
-				} else {
-					return nil, itp.newErrorOperandsMustBe("both numbers", expr.Operator)
 				}
+				return nil, itp.newErrorOperandsMustBe("both numbers", expr.Operator)
 			}
 		}
 
 	case *golox.ExpressionLogical:
 		if lhs, err := itp.evaluate(expr.Left); err != nil {
 			return nil, err
-		} else if expr.Operator.TokenType == golox.TokenTypeOr && helpers.IsValueTruthy(lhs) {
-			return lhs, nil
-		} else if expr.Operator.TokenType == golox.TokenTypeAnd && !helpers.IsValueTruthy(lhs) {
-			return lhs, nil
-		} else if rhs, err := itp.evaluate(expr.Right); err != nil {
-			return nil, err
 		} else {
-			return rhs, nil
+			if expr.Operator.TokenType == golox.TokenTypeOr && isValueTruthy(lhs) {
+				return lhs, nil
+			}
+			if expr.Operator.TokenType == golox.TokenTypeAnd && !isValueTruthy(lhs) {
+				return lhs, nil
+			}
+			if rhs, err := itp.evaluate(expr.Right); err != nil {
+				return nil, err
+			} else {
+				return rhs, nil
+			}
 		}
 
 	case *golox.ExpressionAssignment:

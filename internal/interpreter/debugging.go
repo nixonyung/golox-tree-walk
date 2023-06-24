@@ -4,7 +4,6 @@ import (
 	"fmt"
 	golox "golox/internal"
 	"log"
-	"strings"
 )
 
 const (
@@ -267,27 +266,4 @@ func (itp *Interpreter) newErrorMissingImplementation(
 	return fmt.Errorf("missing implementation for type %T",
 		node,
 	)
-}
-
-func (s *Scope) level() int {
-	if s.Enclosing == nil {
-		return 0
-	} else {
-		return 1 + s.Enclosing.level()
-	}
-}
-
-func (s *Scope) string() string {
-	var builder strings.Builder
-	builder.WriteByte('[')
-	i := 0
-	for identifier := range s.NameToValue {
-		if i != 0 {
-			builder.WriteString(", ")
-		}
-		builder.WriteString(identifier)
-		i++
-	}
-	builder.WriteByte(']')
-	return builder.String()
 }
